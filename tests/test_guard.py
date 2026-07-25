@@ -128,3 +128,61 @@ def test_sage_is_blocked_by_flag_not_by_tier_position(tmp_path):
     assert "escalation_only" in proc.stderr
     assert run_in(tmp_path, "sage",
                   "[router-escalation from builder] checks failed").returncode == 0
+
+
+# --- per-agent opt-in from project config ------------------------------------
+
+def test_project_can_opt_an_agent_in_at_the_ceiling(tmp_path):
+    """Opting in must be configuration, not a workaround.
+
+    Without this the only ways to dispatch a ceiling-tier agent deliberately
+    were MODEL_ROUTER_ALLOW_EXPENSIVE (which disables the guard for every
+    other agent too) or faking an escalation marker (which lies to the
+    metrics). Both are worse than the spawn they were meant to permit.
+    """
+    write_config(tmp_path, {"agents": {"sage": {
+        "tier": "fable", "escalation_only": False,
+        "capabilities": ["deep-reasoning"]}}})
+    assert run_in(tmp_path, "sage", "review this design").returncode == 0
+
+
+def test_opt_in_overrides_a_profile_that_marked_the_agent(tmp_path):
+    write_config(tmp_path, {
+        "profiles": ["sdd-planner"],
+        "agents": {"sdd-planner:code-implementer": {
+            "tier": "opus", "escalation_only": False,
+            "capabilities": ["implement-from-plan"]}},
+    })
+    assert run_in(tmp_path, "sdd-planner:code-implementer",
+                  "implement task 3").returncode == 0
+
+
+def test_opt_in_is_scoped_to_the_named_agent(tmp_path):
+    """Opting one agent in must not open the gate for the rest."""
+    write_config(tmp_path, {"agents": {"sage": {
+        "tier": "fable", "escalation_only": False,
+        "capabilities": ["deep-reasoning"]}}})
+    proc = run_in(tmp_path, "general-purpose", "go wide")
+    assert proc.returncode == 2
+
+
+def test_registering_a_generic_agent_makes_it_routable(tmp_path):
+    """Explicit registration outranks the generic-agent list.
+
+    The guard stops accidental expensive defaults. An agent someone wrote into
+    the registry with a tier is not accidental.
+    """
+    write_config(tmp_path, {"agents": {"Explore": {
+        "tier": "opus", "capabilities": ["broad-search"]}}})
+    assert run_in(tmp_path, "Explore", "sweep the repo").returncode == 0
+    # unregistered generics are untouched by that
+    assert run_in(tmp_path, "general-purpose", "go wide").returncode == 2
+
+
+def test_denial_points_at_the_per_agent_opt_in(tmp_path):
+    """A guard that only offers a session-wide escape teaches the wrong fix."""
+    write_config(tmp_path, {})
+    proc = run_in(tmp_path, "sage", "review this")
+    assert proc.returncode == 2
+    assert '"escalation_only": false' in proc.stderr
+    assert "router-config.json" in proc.stderr

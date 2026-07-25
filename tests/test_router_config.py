@@ -219,3 +219,25 @@ def test_ceiling_ignores_tier_order(tmp_path):
           {"tiers": ["fable", "haiku", "sonnet", "opus"]})
     config = router_config.load(str(tmp_path))
     assert router_config.ceiling_tier(config) == "fable"
+
+
+def test_escalation_only_is_authoritative_in_both_directions():
+    config = router_config.load()
+    ceiling = router_config.ceiling_tier(config)
+    # explicit false opts in even on the ceiling tier
+    assert not router_config.is_escalation_only(
+        {"tier": ceiling, "escalation_only": False}, config)
+    # explicit true guards even on a cheap tier
+    assert router_config.is_escalation_only(
+        {"tier": "haiku", "escalation_only": True}, config)
+    # absent falls back to the tier
+    assert router_config.is_escalation_only({"tier": ceiling}, config)
+    assert not router_config.is_escalation_only({"tier": "haiku"}, config)
+
+
+def test_non_boolean_escalation_only_falls_back_to_tier():
+    config = router_config.load()
+    ceiling = router_config.ceiling_tier(config)
+    for junk in ("yes", 1, None, [], {}):
+        assert router_config.is_escalation_only(
+            {"tier": ceiling, "escalation_only": junk}, config) is True

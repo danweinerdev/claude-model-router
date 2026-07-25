@@ -146,6 +146,7 @@ for cost per tier, escalation rate, and estimated savings versus running the sam
 | `/model-router:models` | registry tiers | Per-project model overrides, e.g. `scout=sonnet` |
 | `/model-router:profiles` | none active | Enable/disable interop profiles, register single agents |
 | `.claude/router-config.json` | none | Per-project registry, tiers, ceiling, and guard settings |
+| `escalation_only: false` (per agent) | absent | Opts one agent in as a routing target even on the ceiling tier, without disabling the guard for anything else |
 | `ceiling` (config) | `fable` | Which tier is the escalation ceiling. Named, not positional, so adding a cheap tier for a local model cannot turn it into the ceiling |
 | `.claude/routing-overrides.md` | none | Per-project routing rules; read first, always win |
 

@@ -68,26 +68,33 @@ def main():
     except Exception:
         return 0  # config trouble must never wedge a spawn
 
-    if router_config.is_generic(agent_type, config):
-        return deny(
-            f"blocked reasoning-tier agent '{agent_type}'. It bills at "
-            "main-loop rates. Route locate/map -> model-router:scout, "
-            "extract/summarise/classify -> model-router:extractor, mechanical "
-            "edits -> model-router:mechanic or model-router:builder, and keep "
-            "reasoning in the main loop. If the task genuinely needs "
-            "main-loop breadth, set MODEL_ROUTER_ALLOW_EXPENSIVE=1 for this "
-            "session."
-        )
-
+    # The registry is consulted before any denial. Registering an agent is a
+    # deliberate statement that it is a routing target at a known tier, so it
+    # outranks the generic-agent list: a project that registers `Explore` with
+    # a tier has said what it means, and the guard exists to stop accidental
+    # expensive defaults, not deliberate ones.
     entry = router_config.lookup(agent_type, config)
+
     if not isinstance(entry, dict):
-        return 0  # unregistered: not this guard's business
+        if router_config.is_generic(agent_type, config):
+            return deny(
+                f"blocked reasoning-tier agent '{agent_type}'. It bills at "
+                "main-loop rates. Route locate/map -> model-router:scout, "
+                "extract/summarise/classify -> model-router:extractor, "
+                "mechanical edits -> model-router:mechanic or "
+                "model-router:builder, and keep reasoning in the main loop. "
+                "If this agent is a deliberate routing target, register it in "
+                ".claude/router-config.json under `agents` with its tier. To "
+                "allow it just for this session, set "
+                "MODEL_ROUTER_ALLOW_EXPENSIVE=1."
+            )
+        return 0  # unregistered and not generic: not this guard's business
 
     ceiling = router_config.ceiling_tier(config)
+    if not router_config.is_escalation_only(entry, config):
+        return 0  # cheaper tier, or an explicit `escalation_only: false` opt-in
+
     by_flag = entry.get("escalation_only") is True
-    by_tier = entry.get("tier") == ceiling
-    if not (by_flag or by_tier):
-        return 0
 
     if ESCALATION_MARKER in spawn_text(tool_input):
         return 0  # a verified escalation; the protocol earned this spawn
@@ -99,15 +106,23 @@ def main():
         else f"on the ceiling tier '{ceiling}'"
     cheaper = entry.get("escalates_from")
     hint = f" Start at '{cheaper}' and escalate on verified failure." if cheaper else ""
-    fix = "" if by_flag else (
-        f" If '{ceiling}' is not meant to be your most expensive tier, set "
-        '"ceiling" in router-config.json to the tier that is.')
+    # Always name the per-agent opt-in. Reaching for the session-wide env var
+    # to dispatch one expensive agent disables the guard for everything else
+    # too, which is a worse outcome than the spawn it was meant to permit.
+    optin = (
+        f' To make \'{agent_type}\' a routing target in its own right, set '
+        f'"escalation_only": false for it under `agents` in '
+        f'.claude/router-config.json.')
+    if not by_flag:
+        optin += (
+            f" If '{ceiling}' is not meant to be your most expensive tier, set "
+            '"ceiling" to the tier that is instead.')
     return deny(
         f"blocked escalation-ceiling agent '{agent_type}' ({reason}) spawned "
         f"as a routing default.{hint} A genuine escalation prefixes its prompt "
         f"with '{ESCALATION_MARKER} from <agent>]' and includes the failed "
-        "attempt's footer; that form is allowed through. Otherwise set "
-        f"MODEL_ROUTER_ALLOW_EXPENSIVE=1 for this session.{fix}"
+        f"attempt's footer; that form is allowed through.{optin} To allow every "
+        "expensive spawn this session, set MODEL_ROUTER_ALLOW_EXPENSIVE=1."
     )
 
 

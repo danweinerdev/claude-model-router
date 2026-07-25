@@ -209,6 +209,31 @@ def ceiling_tier(config=None, cwd=None):
     return available[-1]
 
 
+def is_escalation_only(entry, config=None, cwd=None):
+    """Whether an agent is reachable only as an escalation.
+
+    `escalation_only` is authoritative when present, in either direction:
+
+      true    always guarded, whatever tier it sits on
+      false   an opt-in: a routing target in its own right, even on the
+              ceiling tier. This is how a project declares that an expensive
+              agent is meant to be dispatched directly.
+      absent  inferred from the tier, so the ceiling tier is guarded by
+              default and nobody has to remember the flag to be protected.
+
+    The explicit form exists so opting an agent in is a configuration
+    decision, not a workaround (MODEL_ROUTER_ALLOW_EXPENSIVE, or a faked
+    escalation marker), and so it can be scoped to one agent rather than
+    disabling the guard for a whole session.
+    """
+    if not isinstance(entry, dict):
+        return False
+    declared = entry.get("escalation_only")
+    if isinstance(declared, bool):
+        return declared
+    return entry.get("tier") == ceiling_tier(config, cwd)
+
+
 def guard(config=None, cwd=None):
     config = config if config is not None else load(cwd)
     settings = config.get("guard")

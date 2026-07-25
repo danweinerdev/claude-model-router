@@ -34,7 +34,7 @@ Entry fields, all optional except `tier`:
 | `capabilities` | task signals that should route here - this is what matching keys on |
 | `description` | one line, shown in the registry table |
 | `read_only` | the agent never writes; informational |
-| `escalation_only` | never a routing default; `guard_expensive.py` blocks unmarked spawns |
+| `escalation_only` | authoritative in both directions. `true` guards the agent whatever tier it sits on; `false` opts it in as a routing target even on the ceiling tier; absent infers from the tier |
 | `escalates_from` | the cheaper agent that escalates into this one |
 | `prefetch` | agents that should gather pointers before this one is dispatched |
 | `self_context` | this agent gathers its own context by design - the router must never prefetch for it, never inject gathered material, and never pre-read its inputs |
@@ -64,6 +64,36 @@ This is worth stating because the ceiling used to be positional (`tiers[-1]`),
 which meant appending a cheap tier for a local model silently promoted it to
 the ceiling and blocked every agent on it. If `ceiling` names a tier that is
 not in `tiers`, the last tier is used as a fallback.
+
+#### Opting an agent in
+
+An agent on the ceiling tier is guarded by default, but that default is
+overridable per agent, from the project:
+
+```json
+{
+  "agents": {
+    "sdd-planner:code-implementer": { "tier": "opus", "escalation_only": false }
+  }
+}
+```
+
+That is the supported way to dispatch an expensive agent directly. The
+alternatives are worse: `MODEL_ROUTER_ALLOW_EXPENSIVE=1` disables the guard for
+every other agent in the session, and prefixing a first dispatch with the
+escalation marker lies to the metrics about why the spawn happened.
+
+Registering an agent also outranks the `generic_agents` list. A project that
+writes `Explore` into `agents` with a tier has said what it means, and the
+guard exists to stop accidental expensive defaults, not deliberate ones.
+
+The order the guard resolves in:
+
+1. `MODEL_ROUTER_ALLOW_EXPENSIVE=1` allows everything.
+2. Registered in `agents`? If not, block when generic, otherwise allow.
+3. `escalation_only` explicit? Honour it, either way.
+4. Otherwise infer: on the `ceiling` tier means guarded.
+5. Guarded spawns are still allowed when the prompt carries `[router-escalation ...]`.
 
 Prefer marking an agent `escalation_only` over relying on its tier. The flag
 says what you mean, and it survives a later edit to `tiers` or `ceiling`.
