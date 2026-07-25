@@ -1,0 +1,107 @@
+{
+  "name": "sdd-planner",
+  "description": "Registers the sdd-planner plugin's agents so spec-driven work routes to them instead of being mapped down to the generic workers, and drops read-heavy planning work to the cheap tiers.",
+
+  "agents": {
+    "sdd-planner:spec-reviewer": {
+      "tier": "haiku",
+      "capabilities": ["review-spec", "testability-check", "ambiguity-check"],
+      "read_only": true,
+      "description": "Reviews specs for testability, completeness, ambiguity."
+    },
+    "sdd-planner:researcher": {
+      "tier": "sonnet",
+      "capabilities": ["gather-context", "research-synthesis"],
+      "read_only": true,
+      "prefetch": ["scout", "extractor"],
+      "description": "Compound context gathering across artifacts, code and web. Locate work belongs to scout first."
+    },
+    "sdd-planner:plan-reviewer": {
+      "tier": "sonnet",
+      "capabilities": ["review-plan", "gap-analysis", "feasibility-check"],
+      "read_only": true,
+      "description": "Reviews plans for completeness, feasibility, convention compliance."
+    },
+    "sdd-planner:drift-detector": {
+      "tier": "sonnet",
+      "capabilities": ["review-lane", "detect-drift", "detect-scope-creep"],
+      "read_only": true,
+      "self_context": true,
+      "lane": "plan",
+      "description": "Diff + plan only. Missing work, scope creep, approach drift. Gathers its own context; never prefetch for it."
+    },
+    "sdd-planner:quality-scanner": {
+      "tier": "sonnet",
+      "capabilities": ["review-lane", "review-quality", "detect-over-engineering"],
+      "read_only": true,
+      "self_context": true,
+      "lane": "code",
+      "description": "Diff + code only, intent-blind. Correctness, safety, maintainability. Gathers its own context; never prefetch for it."
+    },
+    "sdd-planner:spec-compliance": {
+      "tier": "sonnet",
+      "capabilities": ["review-lane", "check-requirements-coverage"],
+      "read_only": true,
+      "self_context": true,
+      "lane": "spec",
+      "description": "Diff + specs/designs only. Coverage gaps, contract violations. Gathers its own context; never prefetch for it."
+    },
+    "sdd-planner:blind-spot-finder": {
+      "tier": "sonnet",
+      "capabilities": ["review-lane", "adversarial-review"],
+      "read_only": true,
+      "self_context": true,
+      "lane": "diff-only",
+      "description": "Diff only, no context at all. Adversarial fresh-eyes reviewer. Gathers its own context; never prefetch for it."
+    },
+    "sdd-planner:code-implementer": {
+      "tier": "opus",
+      "capabilities": ["implement-from-plan", "sdd-task-implementation"],
+      "escalation_only": true,
+      "escalates_from": "builder",
+      "description": "Implements an sdd-planner plan task. Reached after builder (sonnet) fails a plan task's acceptance checks, or when the task is flagged high-risk."
+    }
+  },
+
+  "routes": [
+    {
+      "signals": "locating artifacts, listing plans/phases/specs, finding which plan or task covers X, grepping planning artifacts",
+      "route": "scout",
+      "note": "Artifact discovery is locate work. It stays haiku even inside the planning root."
+    },
+    {
+      "signals": "reading a plan phase, spec, design or debrief to pull out tasks, acceptance criteria, frontmatter fields or status",
+      "route": "extractor",
+      "note": "Artifact frontmatter is structured data. Never read a directory of artifacts inline to summarise them."
+    },
+    {
+      "signals": "reviewing a spec for testability, completeness or ambiguity",
+      "route": "sdd-planner:spec-reviewer"
+    },
+    {
+      "signals": "reviewing a plan for completeness, feasibility or convention compliance",
+      "route": "sdd-planner:plan-reviewer"
+    },
+    {
+      "signals": "/sdd-planner:code-review four-lane dispatch",
+      "route": "sdd-planner:drift-detector + quality-scanner + spec-compliance + blind-spot-finder",
+      "note": "Dispatch all four in one message and let each gather its own context. Do NOT prefetch with scout/extractor for these lanes, do NOT read the diff, plan, spec or design bodies in the primary context first, and do NOT substitute a cheap worker for a lane. The lanes were built to find their own context precisely so the orchestrator holds none of it before synthesising their reports; pre-reading collapses four independent perspectives into one while still looking like a four-lane review. /sdd-planner:code-review resolves dispatch metadata only (paths, a diff range) and that resolution is its own job, not a routing decision."
+    },
+    {
+      "signals": "implementing one scoped task from an approved sdd-planner plan",
+      "route": "builder",
+      "escalates_to": "sdd-planner:code-implementer",
+      "note": "Start at sonnet. Escalate to code-implementer (opus) only after the task's acceptance checks fail, per the escalation protocol."
+    }
+  ],
+
+  "guard": {
+    "exempt_planning_root": true
+  },
+
+  "notes": [
+    "Prefetch applies only to agents carrying a `prefetch` field (here: researcher). sdd-planner's agents cannot spawn subagents, so for those agents cheap locating happens in the primary context before dispatch: send scout/extractor first, then hand the resulting file:line pointers over.",
+    "The four review lanes are `self_context: true` and are the explicit exception. They find their own diffs, plans and specs by design, and the orchestrator deliberately holds none of that before synthesis. Never prefetch for them, never pre-read their inputs, never merge or downgrade them. Their value is intent isolation, not tier - and isolation outranks cost.",
+    "Project-supplied review lanes (.claude/agents/*-reviewer.md with reviewLane: true) are dispatched by sdd-planner itself and are not registered here; add them to .claude/router-config.json if you want them tiered."
+  ]
+}
