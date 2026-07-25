@@ -1,0 +1,69 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'MODEL ROUTER ACTIVE - apply this policy to every task, every response. No drift:'; awk '/^---$/{c++; next} c>=2' \"${CLAUDE_PLUGIN_ROOT}/skills/routing/SKILL.md\"; echo; echo 'Registered agents (route to these; never to generic reasoning agents):'; python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/registry.py\" --routes 2>/dev/null || true; python3 \"${CLAUDE_PLUGIN_ROOT}/scripts/stats.py\" --advice 2>/dev/null || true",
+            "timeout": 15,
+            "statusMessage": "Loading routing policy..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'MODEL ROUTER ACTIVE - one-shot deterministic tool first, then cheapest capable agent (scout/extractor -> mechanic/builder -> main loop). Bright line: 3+ inline search/list/read operations on one question = you are exploring inline, delegate to scout/extractor instead. Reading, grepping and scanning files is haiku work even inside a planning root. Escalate only on verified failure.'"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Grep|Glob|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard_inline.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard_expensive.py\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard_sensitive.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/log_metrics.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
