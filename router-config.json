@@ -1,0 +1,50 @@
+{
+  "tiers": ["haiku", "sonnet", "opus", "fable"],
+
+  "agents": {
+    "scout": {
+      "tier": "haiku",
+      "capabilities": ["locate", "find-usages", "map-structure", "grep-logs"],
+      "description": "Read-only locator. file:line answers, no judgement."
+    },
+    "extractor": {
+      "tier": "haiku",
+      "capabilities": ["extract", "classify", "summarise-single-source", "structured-output"],
+      "description": "Structured extraction and single-source summarisation."
+    },
+    "mechanic": {
+      "tier": "sonnet",
+      "capabilities": ["mechanical-edit", "rename", "boilerplate", "pattern-application", "config-change"],
+      "description": "Fully specified edits. Makes zero design decisions."
+    },
+    "builder": {
+      "tier": "sonnet",
+      "capabilities": ["implement-from-plan", "write-tests", "fix-simple-bug"],
+      "description": "Scoped implementation from an approved plan section."
+    },
+    "sage": {
+      "tier": "fable",
+      "capabilities": ["deep-reasoning", "architecture", "debugging", "security-analysis", "deep-review", "final-synthesis"],
+      "description": "Escalation ceiling. Never a routing default."
+    }
+  },
+
+  "generic_agents": ["general-purpose", "Explore", "Plan", "claude"],
+
+  "guard": {
+    "inline_budget": 5,
+    "exempt_planning_root": true,
+    "planning_dirs": [
+      "Research",
+      "Brainstorm",
+      "Specs",
+      "Designs",
+      "Plans",
+      "Decisions",
+      "Retro",
+      "Diagrams"
+    ]
+  },
+
+  "profiles": []
+}
