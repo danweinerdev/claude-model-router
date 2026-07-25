@@ -83,25 +83,31 @@ def main():
     if not isinstance(entry, dict):
         return 0  # unregistered: not this guard's business
 
-    tiers = config.get("tiers")
-    tiers = tiers if isinstance(tiers, list) and tiers \
-        else router_config.DEFAULTS["tiers"]
-    ceiling = entry.get("escalation_only") is True or entry.get("tier") == tiers[-1]
-    if not ceiling:
+    ceiling = router_config.ceiling_tier(config)
+    by_flag = entry.get("escalation_only") is True
+    by_tier = entry.get("tier") == ceiling
+    if not (by_flag or by_tier):
         return 0
 
     if ESCALATION_MARKER in spawn_text(tool_input):
         return 0  # a verified escalation; the protocol earned this spawn
 
+    # Name why this agent counts as the ceiling. A tier-based block on an agent
+    # nobody thinks of as expensive is nearly always a misconfigured `ceiling`,
+    # and that is only diagnosable if the message says which rule fired.
+    reason = "marked escalation_only" if by_flag \
+        else f"on the ceiling tier '{ceiling}'"
     cheaper = entry.get("escalates_from")
     hint = f" Start at '{cheaper}' and escalate on verified failure." if cheaper else ""
+    fix = "" if by_flag else (
+        f" If '{ceiling}' is not meant to be your most expensive tier, set "
+        '"ceiling" in router-config.json to the tier that is.')
     return deny(
-        f"blocked escalation-ceiling agent '{agent_type}' "
-        f"(tier: {entry.get('tier', 'unknown')}) spawned as a routing "
-        f"default.{hint} A genuine escalation prefixes its prompt with "
-        f"'{ESCALATION_MARKER} from <agent>]' and includes the failed "
+        f"blocked escalation-ceiling agent '{agent_type}' ({reason}) spawned "
+        f"as a routing default.{hint} A genuine escalation prefixes its prompt "
+        f"with '{ESCALATION_MARKER} from <agent>]' and includes the failed "
         "attempt's footer; that form is allowed through. Otherwise set "
-        "MODEL_ROUTER_ALLOW_EXPENSIVE=1 for this session."
+        f"MODEL_ROUTER_ALLOW_EXPENSIVE=1 for this session.{fix}"
     )
 
 

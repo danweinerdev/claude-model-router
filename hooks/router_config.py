@@ -30,6 +30,10 @@ PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # sanely if the shipped file is missing from a broken install.
 DEFAULTS = {
     "tiers": ["haiku", "sonnet", "opus", "fable"],
+    # The escalation ceiling, named rather than inferred from the end of
+    # `tiers`. Positional would mean appending a tier (say a cheap local one)
+    # silently turns it into the ceiling and gets its agents blocked.
+    "ceiling": "fable",
     "agents": {
         "scout": {"tier": "haiku", "capabilities": ["locate"]},
         "extractor": {"tier": "haiku", "capabilities": ["extract"]},
@@ -179,6 +183,30 @@ def is_generic(agent_type, config=None, cwd=None):
         generic = DEFAULTS["generic_agents"]
     bare = name.rsplit(":", 1)[-1] if ":" in name else name
     return name in generic or bare in generic
+
+
+def tiers(config=None, cwd=None):
+    config = config if config is not None else load(cwd)
+    value = config.get("tiers")
+    if isinstance(value, list) and value:
+        return value
+    return list(DEFAULTS["tiers"])
+
+
+def ceiling_tier(config=None, cwd=None):
+    """The tier treated as the escalation ceiling.
+
+    Named in config, so tier ordering carries no behaviour. Falls back to the
+    last tier only when nothing valid is named, which keeps the "top of the
+    list is the expensive one" reading working for a config that never
+    considered the question.
+    """
+    config = config if config is not None else load(cwd)
+    available = tiers(config)
+    named = config.get("ceiling")
+    if isinstance(named, str) and named in available:
+        return named
+    return available[-1]
 
 
 def guard(config=None, cwd=None):

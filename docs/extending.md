@@ -44,6 +44,30 @@ Entry fields, all optional except `tier`:
 
 Getting this wrong fails silently: prefetching for such an agent still returns a well-formed report, it just returns one that no longer carries the independence you dispatched it for. The routing skill treats `self_context` as a correctness rule that outranks every cost rule in the policy, so mark it whenever you are unsure - the cost of a needless flag is a few tokens, the cost of a missing one is a review that lies about what it is.
 
+### Tiers and the escalation ceiling
+
+`tiers` lists the tier names a registry entry may use. Order is for display
+only; nothing behavioural depends on it.
+
+The escalation ceiling is named explicitly by `ceiling`, and agents on that
+tier are blocked unless their spawn carries the `[router-escalation ...]`
+marker:
+
+```json
+{
+  "tiers": ["local", "haiku", "sonnet", "opus", "fable"],
+  "ceiling": "fable"
+}
+```
+
+This is worth stating because the ceiling used to be positional (`tiers[-1]`),
+which meant appending a cheap tier for a local model silently promoted it to
+the ceiling and blocked every agent on it. If `ceiling` names a tier that is
+not in `tiers`, the last tier is used as a fallback.
+
+Prefer marking an agent `escalation_only` over relying on its tier. The flag
+says what you mean, and it survives a later edit to `tiers` or `ceiling`.
+
 ## 2. Add a worker
 
 Create `agents/<name>.md`. The `description` frontmatter advertises capabilities; the router matches task signals against it. Keep the body short and end with the worker footer contract, verbatim:

@@ -65,6 +65,7 @@ Escalations are marked `[router-escalation from <agent>]`. That marker is load-b
 ```json
 {
   "tiers": ["haiku", "sonnet", "opus", "fable"],
+  "ceiling": "fable",
   "agents": {
     "scout": { "tier": "haiku", "capabilities": ["locate", "map-structure"] }
   },
@@ -144,7 +145,8 @@ for cost per tier, escalation rate, and estimated savings versus running the sam
 | `MODEL_ROUTER_SENSITIVITY_CONFIG` | `.claude/router-sensitivity.json` | Sensitivity gate rules |
 | `/model-router:models` | registry tiers | Per-project model overrides, e.g. `scout=sonnet` |
 | `/model-router:profiles` | none active | Enable/disable interop profiles, register single agents |
-| `.claude/router-config.json` | none | Per-project registry, tiers, and guard settings |
+| `.claude/router-config.json` | none | Per-project registry, tiers, ceiling, and guard settings |
+| `ceiling` (config) | `fable` | Which tier is the escalation ceiling. Named, not positional, so adding a cheap tier for a local model cannot turn it into the ceiling |
 | `.claude/routing-overrides.md` | none | Per-project routing rules; read first, always win |
 
 Too aggressive? `MODEL_ROUTER_ALLOW_INLINE=1` turns the hard guard off while keeping the advisory policy. Want it gone entirely? `/plugin uninstall model-router` - the router keeps no state outside the metrics file.

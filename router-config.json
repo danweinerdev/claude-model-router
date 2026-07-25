@@ -1,6 +1,9 @@
 {
   "tiers": ["haiku", "sonnet", "opus", "fable"],
 
+  "//ceiling": "The escalation ceiling, named rather than inferred from the end of `tiers`. Agents on this tier are blocked unless their spawn carries the [router-escalation ...] marker. Set this whenever you change `tiers`, or a newly appended tier becomes the ceiling by accident.",
+  "ceiling": "fable",
+
   "agents": {
     "scout": {
       "tier": "haiku",
@@ -24,6 +27,7 @@
     },
     "sage": {
       "tier": "fable",
+      "escalation_only": true,
       "capabilities": ["deep-reasoning", "architecture", "debugging", "security-analysis", "deep-review", "final-synthesis"],
       "description": "Escalation ceiling. Never a routing default."
     }

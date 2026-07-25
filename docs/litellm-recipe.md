@@ -61,3 +61,17 @@ The same mechanism works with Ollama or any OpenAI-compatible endpoint:
 ```
 
 Expect degraded tool-calling reliability with small local models; keep them on `extractor`-style tasks and let escalation catch failures.
+
+If you give local models their own tier rather than remapping an existing one, add the tier to `tiers` in `router-config.json` and leave `ceiling` pointing at your real top tier:
+
+```json
+{
+  "tiers": ["local", "haiku", "sonnet", "opus", "fable"],
+  "ceiling": "fable",
+  "agents": { "localextractor": { "tier": "local", "capabilities": ["extract"] } }
+}
+```
+
+`ceiling` is named rather than inferred from the end of `tiers`, so the tier's position in the list does not matter.
+
+Cost reporting needs attention too: `scripts/stats.py` prices by model-name substring and falls back to the top-tier rate for anything it does not recognise, which would report a free local model as your most expensive one. Add a zero-cost `PRICES` entry for it.

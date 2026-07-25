@@ -193,3 +193,29 @@ def test_registry_script_compact_mode():
         capture_output=True, text=True)
     assert proc.returncode == 0
     assert "scout [haiku]:" in proc.stdout
+
+
+def test_shipped_ceiling_is_a_real_tier():
+    config = router_config.load()
+    assert config["ceiling"] in config["tiers"]
+    assert router_config.ceiling_tier(config) == config["ceiling"]
+
+
+def test_shipped_ceiling_agents_are_flagged_not_merely_positioned():
+    """Every agent on the ceiling tier must also say so explicitly.
+
+    Tier position is the fallback, not the mechanism; relying on it means a
+    tiers edit changes which agents are guarded.
+    """
+    config = router_config.load()
+    ceiling = router_config.ceiling_tier(config)
+    for name, entry in router_config.agents(config).items():
+        if entry.get("tier") == ceiling:
+            assert entry.get("escalation_only") is True, name
+
+
+def test_ceiling_ignores_tier_order(tmp_path):
+    write(tmp_path / ".claude" / "router-config.json",
+          {"tiers": ["fable", "haiku", "sonnet", "opus"]})
+    config = router_config.load(str(tmp_path))
+    assert router_config.ceiling_tier(config) == "fable"
