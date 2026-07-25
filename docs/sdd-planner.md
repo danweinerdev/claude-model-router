@@ -47,7 +47,9 @@ If a plan task is known to be high-risk, route straight to `code-implementer` - 
 
 The router's `PreToolUse` inline guard denies main-loop `Read`/`Grep`/`Glob`/searchy-`Bash` past a budget (default 5 per prompt), on the theory that iterative discovery belongs in a haiku worker. sdd-planner's lifecycle skills legitimately read many artifacts in the primary context - `/plan` walks phase files, `/code-review` resolves plan metadata, `/excavate` sweeps the tree.
 
-So `guard_inline.py` resolves the planning root exactly as sdd-planner does (`shared/path-resolution.md`: walk up for `planning-config.json`, resolve its `planningRoot`), and operations confined to it are not counted. With no `planning-config.json` anywhere, the conventional directory names (`Plans/`, `Specs/`, `Designs/`, `Research/`, `Brainstorm/`, `Decisions/`) are exempt instead.
+So `guard_inline.py` resolves the planning root exactly as sdd-planner does (`shared/path-resolution.md`: walk up for `planning-config.json`, resolve its `planningRoot`), and operations confined to it are not counted. The default `.plans` root works in every written form (`.plans`, `./.plans`, or an absolute path). With no `planning-config.json` anywhere, the conventional directory names (`.plans/`, `Plans/`, `Specs/`, `Designs/`, `Research/`, `Brainstorm/`, `Decisions/`) are exempt instead.
+
+Detection covers where each tool actually puts its path. `Read` uses `file_path`, `Grep` uses `path`, and `Bash` has its path arguments parsed out of the command. `Glob` is the awkward one: it carries the directory inside `pattern`, and `Grep`'s `glob` filter does the same, so the guard takes the pattern's literal prefix (`.plans/**/*.md` gives `.plans`). A pattern with no literal prefix, such as `**/*.py`, could match anywhere and stays counted. `Grep`'s own `pattern` is a regex and is never read as a path, so a regex that happens to look like `.plans/Plans` buys no exemption for a `src` scan.
 
 The exemption is deliberately narrow:
 

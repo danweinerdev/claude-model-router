@@ -35,6 +35,7 @@
     "inline_budget": 5,
     "exempt_planning_root": true,
     "planning_dirs": [
+      ".plans",
       "Research",
       "Brainstorm",
       "Specs",

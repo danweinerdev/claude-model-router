@@ -44,6 +44,9 @@ DEFAULTS = {
         "inline_budget": 5,
         "exempt_planning_root": True,
         "planning_dirs": [
+            # ".plans" is the conventional hidden root; the rest are the
+            # artifact directories, used when no planning-config.json exists.
+            ".plans",
             "Research", "Brainstorm", "Specs", "Designs", "Plans",
             "Decisions", "Retro", "Diagrams",
         ],

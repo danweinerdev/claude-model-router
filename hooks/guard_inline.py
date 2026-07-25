@@ -48,6 +48,10 @@ WRITE_REDIRECT = re.compile(r"(?<![\d&])>|&>")
 PATH_TOKEN = re.compile(r"^[~./]?[\w.@+-]+(?:/[\w.*?@+-]*)+/?$|^[A-Z][\w-]*/?$")
 
 PATH_FIELDS = ("file_path", "path", "notebook_path", "filePath")
+# Glob and Grep often carry the directory inside the pattern rather than in a
+# path field (`Glob: ".plans/**/*.md"`), so the pattern's literal prefix has to
+# count as a path or artifact globbing looks unscoped and gets throttled.
+GLOB_META = set("*?[]{}!")
 
 
 def counter_path(payload):
@@ -80,6 +84,31 @@ def bash_path_tokens(command, cwd):
     return tokens
 
 
+def glob_literal_prefix(pattern):
+    """The leading path components of a glob that contain no wildcards.
+
+    `.plans/**/*.md` -> `.plans`, `/abs/Specs/*.md` -> `/abs/Specs`,
+    `**/*.py` -> None. Only the literal head is a path; the wildcard tail could
+    match anywhere, so a pattern with no literal head stays unscoped and is
+    counted like any other broad search.
+    """
+    if not isinstance(pattern, str) or not pattern:
+        return None
+    parts = []
+    for part in pattern.split("/"):
+        if not part:
+            if not parts:
+                parts.append("")  # leading empty: absolute pattern
+                continue
+            break
+        if set(part) & GLOB_META:
+            break
+        parts.append(part)
+    if not parts or parts == [""]:
+        return None
+    return "/".join(parts) or None
+
+
 def candidate_paths(tool, tool_input, cwd):
     if tool == "Bash":
         return bash_path_tokens(tool_input.get("command", "") or "", cwd)
@@ -88,6 +117,13 @@ def candidate_paths(tool, tool_input, cwd):
         value = tool_input.get(field)
         if isinstance(value, str) and value:
             paths.append(value)
+    # Glob's `pattern` is a path glob. Grep's `pattern` is a regex to search
+    # for, never a path -- only its `glob` field filters paths.
+    pattern_field = {"Glob": "pattern", "Grep": "glob"}.get(tool)
+    if pattern_field:
+        prefix = glob_literal_prefix(tool_input.get(pattern_field))
+        if prefix:
+            paths.append(prefix)
     return paths
 
 
