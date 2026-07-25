@@ -1,0 +1,23 @@
+# NOTICE
+
+`model-router` is a derivative work of **frugal** by Thomas Langbroek,
+used under the MIT License.
+
+    Upstream: https://github.com/ThomasLangbroek/frugal
+    Licence:  MIT, Copyright (c) 2026 Thomas Langbroek
+
+The following are derived from frugal, with modifications:
+
+| File | Origin | Change |
+|---|---|---|
+| `agents/{scout,extractor,mechanic,builder,sage}.md` | frugal | renamed branding |
+| `hooks/guard_inline.py` | frugal | planning-root exemption, config-driven budget |
+| `hooks/guard_expensive.py` | frugal (`guard_expensive.sh`) | ported to Python; consults the agent registry instead of a fixed list, and admits escalation-marked spawns |
+| `hooks/guard_sensitive.py` | frugal | renamed config path |
+| `hooks/log_metrics.py` | frugal | registry-aware tier attribution |
+| `scripts/stats.py`, `scripts/statusline.py` | frugal | renamed env vars and metrics path |
+| `skills/{routing,models,router-stats,setup-statusline}/SKILL.md` | frugal | generic registry, external-agent routing |
+| `tests/*` | frugal | ported to the new naming and config layer |
+
+New in this project (not from frugal): `router-config.json`, `hooks/router_config.py`,
+`scripts/registry.py`, `profiles/`, `skills/profiles/`, `docs/sdd-planner.md`.
