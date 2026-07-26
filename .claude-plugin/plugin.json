@@ -1,7 +1,7 @@
 {
   "name": "model-router",
   "displayName": "Model Router",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Generic model router for Claude Code: routes every sub-task to the cheapest capable tier, escalates only on verified failure, and routes to agents from other plugins via a configurable registry.",
   "author": {
     "name": "Daniel Weiner"
