@@ -35,7 +35,8 @@ Entry fields, all optional except `tier`:
 | `description` | one line, shown in the registry table |
 | `read_only` | the agent never writes; informational |
 | `escalation_only` | authoritative in both directions. `true` guards the agent whatever tier it sits on; `false` opts it in as a routing target even on the ceiling tier; absent infers from the tier |
-| `escalates_from` | the cheaper agent that escalates into this one |
+| `escalates_to` | the pricier agent this one escalates to on verified failure. Declared on the agent that fails, since that is where the protocol looks |
+| `escalates_from` | the reverse view, for readability. Never an escalation target: it names the rung already tried |
 | `prefetch` | agents that should gather pointers before this one is dispatched |
 | `self_context` | this agent gathers its own context by design - the router must never prefetch for it, never inject gathered material, and never pre-read its inputs |
 | `lane` | review-lane identity, for intent-isolated reviewers |
@@ -64,6 +65,26 @@ This is worth stating because the ceiling used to be positional (`tiers[-1]`),
 which meant appending a cheap tier for a local model silently promoted it to
 the ceiling and blocked every agent on it. If `ceiling` names a tier that is
 not in `tiers`, the last tier is used as a fallback.
+
+#### Escalation links
+
+Declare the link on the agent that fails:
+
+```json
+{ "agents": { "builder": { "escalates_to": "my-plugin:deep-implementer" } } }
+```
+
+Agent entries merge field-wise, so a profile can annotate a built-in worker
+like this without restating its tier or capabilities.
+
+Two rules are enforced by the test suite rather than left to review, because
+both failures produce a retry that is worse than the attempt that triggered it:
+
+- **Escalation moves up.** The target must sit on a higher tier. A link
+  pointing down or sideways re-dispatches to a rung that already failed.
+- **Escalation keeps the capability.** The target must share a capability with
+  the source, so the retry can actually do the job. Escalating a specialised
+  implementer into a pricier generalist buys cost without buying the outcome.
 
 #### Opting an agent in
 

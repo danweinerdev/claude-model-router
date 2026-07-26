@@ -3,6 +3,11 @@
   "description": "Registers the sdd-planner plugin's agents so spec-driven work routes to them instead of being mapped down to the generic workers, and drops read-heavy planning work to the cheap tiers.",
 
   "agents": {
+    "builder": {
+      "escalates_to": "sdd-planner:code-implementer",
+      "//": "Annotates the built-in worker so the escalation target is readable from the agent that fails, which is where the protocol looks. Merged field-wise; builder's tier and capabilities are untouched."
+    },
+
     "sdd-planner:spec-reviewer": {
       "tier": "haiku",
       "capabilities": ["review-spec", "testability-check", "ambiguity-check"],

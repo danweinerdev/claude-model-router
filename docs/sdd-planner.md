@@ -37,6 +37,10 @@ Without this, the router's "generic agents are never routing targets" rule has n
 
 **2. Plan tasks start at sonnet, not opus.** `builder` (sonnet) takes a scoped plan task first. `sdd-planner:code-implementer` (opus) is registered `escalates_from: builder` - reached after the task's acceptance checks verifiably fail, prefixed `[router-escalation from builder]`. For mechanical tasks this is most of the saving; for genuinely hard ones you pay one cheap attempt on the way to the right tier.
 
+The link is declared on `builder` as `escalates_to`, which is where the protocol looks when a dispatch fails: at the agent that just failed, not at the one it might reach. `code-implementer` carries the mirror `escalates_from: builder` for readability. Both directions are validated in CI, and escalation must move **up** a tier while sharing a capability with the agent it replaces, so a link can never silently re-dispatch to the rung that just failed or swap the implementer for a pricier generalist.
+
+Note where the ladder ends. `sage` is the ceiling for *reasoning* and is read-only, so it cannot finish an implementation task. If a plan task exhausts `builder` and `code-implementer`, `sage` diagnoses and the main loop applies the fix, or the specialist is re-dispatched once with `sage`'s analysis in its prompt. Handing an implementation task to `sage` is never the same as completing it.
+
 If a plan task is known to be high-risk, route straight to `code-implementer` - the decision table permits starting high when the task type demands it. The escalation ladder is a default, not a rule against judgement.
 
 **3. The four review lanes are never merged or downgraded.** `/sdd-planner:code-review` dispatches `drift-detector`, `quality-scanner`, `spec-compliance` and `blind-spot-finder` in parallel, each with a deliberately different input bundle. Their value is intent isolation. Collapsing them into one cheaper reviewer produces a single-pass review cosplaying as a four-lane one - the profile's routes say so explicitly so the router doesn't "optimise" it.

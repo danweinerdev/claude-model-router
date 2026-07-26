@@ -1,6 +1,8 @@
 import json
 import subprocess
 import sys
+
+import pytest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -145,6 +147,13 @@ def test_shipped_profiles_are_wellformed():
         assert profile["name"] == path.stem
         assert profile["description"]
         for name, entry in profile["agents"].items():
+            if "tier" not in entry:
+                # An annotation: adds fields to an agent that already exists
+                # (an escalation link on a built-in worker, say). It merges
+                # field-wise, so it must not need to restate tier/capabilities.
+                assert name in config["agents"], \
+                    f"{path.name}:{name} has no tier and no entry to extend"
+                continue
             assert entry["tier"] in tiers, f"{path.name}:{name}"
             assert entry["capabilities"], f"{path.name}:{name}"
             if entry.get("escalates_from"):
@@ -241,3 +250,89 @@ def test_non_boolean_escalation_only_falls_back_to_tier():
     for junk in ("yes", 1, None, [], {}):
         assert router_config.is_escalation_only(
             {"tier": ceiling, "escalation_only": junk}, config) is True
+
+
+# --- escalation links -------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def escalation_config(tmp_path_factory):
+    """Registry with every shipped profile active, so links are resolvable."""
+    names = sorted(p.stem for p in (ROOT / "profiles").glob("*.json"))
+    root = tmp_path_factory.mktemp("escalation")
+    write(root / ".claude" / "router-config.json", {"profiles": names})
+    return router_config.load(str(root))
+
+
+def tier_rank(entry, config):
+    order = config["tiers"]
+    tier = entry.get("tier")
+    return order.index(tier) if tier in order else -1
+
+
+def test_escalation_always_moves_up_a_tier(escalation_config):
+    """A link that points down or sideways is a worse retry than the failure.
+
+    This is the mechanical guard against re-dispatching to the rung that just
+    failed, or swapping a specialist for a cheaper worker on the way "up".
+    """
+    config = escalation_config
+    registry = router_config.agents(config)
+    for name, entry in registry.items():
+        target_name = entry.get("escalates_to")
+        if not target_name:
+            continue
+        target = router_config.lookup(target_name, config)
+        assert target is not None, f"{name} escalates_to unknown '{target_name}'"
+        assert tier_rank(target, config) > tier_rank(entry, config), \
+            f"{name} -> {target_name} does not move up a tier"
+
+
+def test_escalates_from_names_a_cheaper_agent(escalation_config):
+    config = escalation_config
+    for name, entry in router_config.agents(config).items():
+        source_name = entry.get("escalates_from")
+        if not source_name:
+            continue
+        source = router_config.lookup(source_name, config)
+        assert source is not None, f"{name} escalates_from unknown '{source_name}'"
+        assert tier_rank(source, config) < tier_rank(entry, config), \
+            f"{name} claims to be reached from '{source_name}', which is not cheaper"
+
+
+def test_escalation_links_agree_in_both_directions(escalation_config):
+    """A one-sided link is how the target becomes unreachable in practice."""
+    config = escalation_config
+    registry = router_config.agents(config)
+    for name, entry in registry.items():
+        if entry.get("escalates_to"):
+            target = router_config.lookup(entry["escalates_to"], config)
+            back = target.get("escalates_from")
+            assert back is None or router_config.lookup(back, config) is entry \
+                or back == name, \
+                f"{name} -> {entry['escalates_to']} but it names '{back}' as its source"
+
+
+def test_escalation_preserves_the_capability(escalation_config):
+    """Escalating must not swap the specialist for a pricier generalist.
+
+    The next rung has to be able to do the job that just failed, so it must
+    share a capability with the agent it replaces.
+    """
+    config = escalation_config
+    for name, entry in router_config.agents(config).items():
+        target_name = entry.get("escalates_to")
+        if not target_name:
+            continue
+        target = router_config.lookup(target_name, config)
+        shared = set(entry.get("capabilities") or []) & set(target.get("capabilities") or [])
+        assert shared, \
+            f"{name} -> {target_name} shares no capability; the retry cannot do the job"
+
+
+def test_profile_annotation_does_not_erase_the_builtin_entry(escalation_config):
+    """The sdd-planner profile adds an escalation link to `builder`."""
+    config = escalation_config
+    builder = router_config.agents(config)["builder"]
+    assert builder["tier"] == "sonnet"
+    assert "implement-from-plan" in builder["capabilities"]
+    assert builder["escalates_to"] == "sdd-planner:code-implementer"

@@ -71,13 +71,29 @@ def _read(path):
 
 
 def _merge(base, overlay):
-    """Shallow merge, except `agents` and `guard` which merge per key."""
+    """Shallow merge, except `agents` and `guard`.
+
+    `guard` merges per setting. `agents` merges per agent and then per field,
+    so a profile can annotate a built-in agent (adding an escalation link, say)
+    and a project can retier one agent, without either having to restate the
+    entry's capabilities and lose them.
+    """
     for key, value in overlay.items():
-        if key in MERGE_BY_KEY and isinstance(value, dict) \
-                and isinstance(base.get(key), dict):
-            base[key] = {**base[key], **value}
-        else:
+        if key not in MERGE_BY_KEY or not isinstance(value, dict) \
+                or not isinstance(base.get(key), dict):
             base[key] = value
+            continue
+        if key != "agents":
+            base[key] = {**base[key], **value}
+            continue
+        merged = dict(base[key])
+        for name, entry in value.items():
+            current = merged.get(name)
+            if isinstance(current, dict) and isinstance(entry, dict):
+                merged[name] = {**current, **entry}
+            else:
+                merged[name] = entry
+        base[key] = merged
     return base
 
 

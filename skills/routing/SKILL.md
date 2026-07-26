@@ -85,10 +85,20 @@ Security-sensitive changes, destructive operations, ambiguous requirements, anyt
 
 ## Escalation protocol (verification first)
 
-1. A deterministic check exists for the worker's output (tests, compiler, schema validation, diff applies, `terraform validate`): run it. Pass = done. Fail = re-dispatch one tier up (haiku worker -> equivalent sonnet worker; sonnet worker -> the registry's `escalates_from` target for that task, or take over yourself), maximum one retry. Prefix the retry prompt with `[router-escalation from <agent>]` and include the failed attempt's footer.
+1. A deterministic check exists for the worker's output (tests, compiler, schema validation, diff applies, `terraform validate`): run it. Pass = done. Fail = re-dispatch one tier **up**, maximum one retry, prefixing the retry prompt with `[router-escalation from <agent>]` and including the failed attempt's footer. Pick the target in this order:
+   - the failed agent's own `escalates_to`, if it has one. This is the declared next rung and it always names a **higher** tier.
+   - otherwise an agent with the same capability at the next tier up.
+   - otherwise take over yourself.
+
+**Escalation only ever moves up, and it keeps the specialisation.** Two ways to get this wrong, both of which silently produce a worse attempt than the one that just failed:
+
+- Reading an escalation link backwards. `escalates_to` points up; `escalates_from` is the reverse view, recording which cheaper agent arrives here. Never re-dispatch to an agent's `escalates_from` after a failure - that is the rung you already tried.
+- Dropping the specialist for a generic worker of the same tier. If a specialised agent fails, the next rung is a **more capable agent that can still do that job**, not a general one that happens to cost more. A specialised implementation task escalates to a more capable implementer; it never falls back to a cheaper or more generic implementer, and it never escalates into a read-only agent that cannot perform the task at all.
 2. No deterministic check: spot-read the result yourself. You receive it anyway; judging it costs almost nothing.
 3. The worker's `ESCALATE: yes` is advisory input to rules 1 and 2, never the sole trigger.
 4. If the task still exceeds your own tier after you take over: hand it to `sage` with the full failure history, prefixed `[router-escalation from main]`. One attempt, final.
+
+   `sage` is read-only, so it is the ceiling for *reasoning*, not a ceiling that can finish work. For a task that has to produce changes, `sage` diagnoses and you apply the result, or you re-dispatch the specialist one more time with `sage`'s analysis in the prompt. Never treat handing a task to `sage` as having completed it.
 5. Never start at an expensive tier unless the decision table sends you there.
 
 The `[router-escalation ...]` marker is load-bearing twice over: `guard_expensive.py` allows escalation-ceiling spawns that carry it, and `log_metrics.py` counts escalations by it. Emit it on every escalation, never on a first dispatch.

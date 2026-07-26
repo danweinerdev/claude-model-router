@@ -58,6 +58,15 @@ def main(argv):
             notes.append("**self-context - never prefetch**")
         elif entry.get("prefetch"):
             notes.append("prefetch via " + "/".join(entry["prefetch"]))
+        # Shown on the agent that fails, since that is where the protocol
+        # looks when deciding where to escalate. Direction is spelled out so
+        # the link cannot be read as a downgrade.
+        if entry.get("escalates_to"):
+            notes.append(f"on verified failure escalate UP to "
+                         f"`{entry['escalates_to']}`")
+        if entry.get("escalates_from"):
+            notes.append(f"reached by escalation FROM "
+                         f"`{entry['escalates_from']}`")
         print(f"| `{name}` | {entry.get('tier', '?')} | {caps} | "
               f"{'; '.join(notes) or '-'} |")
 
