@@ -39,6 +39,8 @@ Without this, the router's "generic agents are never routing targets" rule has n
 
 The link is declared on `builder` as `escalates_to`, which is where the protocol looks when a dispatch fails: at the agent that just failed, not at the one it might reach. `code-implementer` carries the mirror `escalates_from: builder` for readability. Both directions are validated in CI, and escalation must move **up** a tier while sharing a capability with the agent it replaces, so a link can never silently re-dispatch to the rung that just failed or swap the implementer for a pricier generalist.
 
+If the profile is disabled, nothing breaks: `builder` loses its `escalates_to`, and a failed plan task is retried as `builder` at a higher tier instead. The specialist is an upgrade to the ladder, not a dependency of it.
+
 Note where the ladder ends. `sage` is the ceiling for *reasoning* and is read-only, so it cannot finish an implementation task. If a plan task exhausts `builder` and `code-implementer`, `sage` diagnoses and the main loop applies the fix, or the specialist is re-dispatched once with `sage`'s analysis in its prompt. Handing an implementation task to `sage` is never the same as completing it.
 
 If a plan task is known to be high-risk, route straight to `code-implementer` - the decision table permits starting high when the task type demands it. The escalation ladder is a default, not a rule against judgement.

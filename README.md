@@ -56,6 +56,10 @@ The router then applies four rules:
 3. The worker's `ESCALATE: yes` is advisory input, never the sole trigger. Self-reported confidence from a cheap model is poorly calibrated; observable failure is not.
 4. Never start at an expensive tier unless the decision table requires it. `sage` is reached only via high-risk table rows or after escalation exhausts - one attempt, final.
 
+Escalation prefers **re-dispatching the same agent one tier up** (passing the higher tier as the Agent tool's `model` parameter) over swapping it for another agent, since that changes capability and nothing else. A different agent is used only where the registry declares one via `escalates_to`, and if that target is not registered, because its profile is off or its plugin is absent, the protocol falls back to tier-retry. The built-in workers are always the whole ladder on their own.
+
+Because the model can be named per spawn, the ceiling is judged on the model that will actually run, not on the tier written in the registry.
+
 Escalations are marked `[router-escalation from <agent>]`. That marker is load-bearing twice: `guard_expensive.py` admits escalation-ceiling spawns that carry it, and `log_metrics.py` counts escalations by it.
 
 ## The registry

@@ -77,6 +77,16 @@ Declare the link on the agent that fails:
 Agent entries merge field-wise, so a profile can annotate a built-in worker
 like this without restating its tier or capabilities.
 
+A link is a declared *preference*, not a requirement. If it names an agent the
+registry does not have, because the profile is off or the plugin is not
+installed, the protocol falls back to re-dispatching the same agent one tier up
+via the Agent tool's `model` parameter. Routing degrades to the built-in
+workers rather than failing, so the router stands alone.
+
+Prefer tier-retry when the agent is already the right specialist: it changes
+capability and nothing else. Declare `escalates_to` only when a genuinely more
+capable *different* agent exists for the job.
+
 Two rules are enforced by the test suite rather than left to review, because
 both failures produce a retry that is worse than the attempt that triggered it:
 

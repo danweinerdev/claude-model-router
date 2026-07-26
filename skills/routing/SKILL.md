@@ -72,6 +72,12 @@ This is a **correctness rule, not a cost rule**, and it outranks every saving in
 
 The clearest case is a panel of intent-isolated reviewers: each lane is deliberately given a different, partial view, and the orchestrator deliberately holds none of it. Fanning `scout` out ahead of them, or pre-reading their inputs to "save" them the work, collapses several independent perspectives into one - and it collapses them *silently*, since the output still looks like a multi-lane review.
 
+### Without profiles
+
+The five built-in workers are the whole ladder when no profile is enabled: `scout`/`extractor` (haiku), `mechanic`/`builder` (sonnet), you, then `sage`. Nothing about the protocol depends on another plugin being installed.
+
+Profiles add specialists; they never replace this ladder. So an escalation link pointing into a profile that is not enabled simply falls back to retrying the same built-in worker at a higher tier, and routing degrades to the built-ins rather than failing. Never dispatch an agent that is not in the registry you were shown on the assumption that some plugin provides it.
+
 ## Never delegate
 
 Security-sensitive changes, destructive operations, ambiguous requirements, anything needing user judgement. These stay in the main loop, always.
@@ -86,13 +92,14 @@ Security-sensitive changes, destructive operations, ambiguous requirements, anyt
 ## Escalation protocol (verification first)
 
 1. A deterministic check exists for the worker's output (tests, compiler, schema validation, diff applies, `terraform validate`): run it. Pass = done. Fail = re-dispatch one tier **up**, maximum one retry, prefixing the retry prompt with `[router-escalation from <agent>]` and including the failed attempt's footer. Pick the target in this order:
-   - the failed agent's own `escalates_to`, if it has one. This is the declared next rung and it always names a **higher** tier.
-   - otherwise an agent with the same capability at the next tier up.
+   - the failed agent's own `escalates_to`, **if that agent is in the registry**. This is a declared, more capable specialist and it always names a higher tier. If the entry names an agent the registry does not have (its profile is not enabled, or its plugin is not installed), treat the link as absent and fall through.
+   - otherwise **re-dispatch the same agent one tier up**, by passing the higher tier as the Agent tool's `model` parameter. Same agent, same prompt, more capable model.
    - otherwise take over yourself.
 
 **Escalation only ever moves up, and it keeps the specialisation.** Two ways to get this wrong, both of which silently produce a worse attempt than the one that just failed:
 
 - Reading an escalation link backwards. `escalates_to` points up; `escalates_from` is the reverse view, recording which cheaper agent arrives here. Never re-dispatch to an agent's `escalates_from` after a failure - that is the rung you already tried.
+- Swapping the agent when you only needed a better model. Re-dispatching the same agent at a higher tier is the default escalation, because it changes exactly one thing: capability. Reach for a different agent only when the registry declares one, or when the failure was a capability the agent does not have at any tier.
 - Dropping the specialist for a generic worker of the same tier. If a specialised agent fails, the next rung is a **more capable agent that can still do that job**, not a general one that happens to cost more. A specialised implementation task escalates to a more capable implementer; it never falls back to a cheaper or more generic implementer, and it never escalates into a read-only agent that cannot perform the task at all.
 2. No deterministic check: spot-read the result yourself. You receive it anyway; judging it costs almost nothing.
 3. The worker's `ESCALATE: yes` is advisory input to rules 1 and 2, never the sole trigger.

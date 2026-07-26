@@ -186,3 +186,55 @@ def test_denial_points_at_the_per_agent_opt_in(tmp_path):
     assert proc.returncode == 2
     assert '"escalation_only": false' in proc.stderr
     assert "router-config.json" in proc.stderr
+
+
+# --- model overrides and the ceiling ----------------------------------------
+
+def test_tier_retry_below_the_ceiling_is_allowed(tmp_path):
+    """Re-dispatching the same agent one tier up is the default escalation."""
+    write_config(tmp_path, {})
+    base = {"tool_name": "Agent", "cwd": str(tmp_path),
+            "tool_input": {"subagent_type": "builder", "model": "opus",
+                           "prompt": "[router-escalation from builder] checks failed"}}
+    assert run_guard(base).returncode == 0
+
+
+def test_model_override_cannot_reach_the_ceiling_unguarded(tmp_path):
+    """The ceiling is about the model that runs, not the tier on the label.
+
+    Judging only the registered tier let any cheap agent be spawned at the
+    ceiling by naming the model directly.
+    """
+    write_config(tmp_path, {})
+    for model in ("fable", "claude-fable-5"):
+        base = {"tool_name": "Agent", "cwd": str(tmp_path),
+                "tool_input": {"subagent_type": "scout", "model": model,
+                               "prompt": "find X"}}
+        proc = run_guard(base)
+        assert proc.returncode == 2, model
+        assert "ceiling" in proc.stderr
+
+
+def test_model_override_to_ceiling_passes_on_a_real_escalation(tmp_path):
+    write_config(tmp_path, {})
+    base = {"tool_name": "Agent", "cwd": str(tmp_path),
+            "tool_input": {"subagent_type": "scout", "model": "fable",
+                           "prompt": "[router-escalation from scout] nothing found"}}
+    assert run_guard(base).returncode == 0
+
+
+def test_unrecognised_model_fails_open(tmp_path):
+    """A local or proxied model id names no tier the router knows; allow."""
+    write_config(tmp_path, {})
+    base = {"tool_name": "Agent", "cwd": str(tmp_path),
+            "tool_input": {"subagent_type": "scout", "model": "some-local-llm",
+                           "prompt": "find X"}}
+    assert run_guard(base).returncode == 0
+
+
+def test_opt_in_also_covers_a_model_override(tmp_path):
+    write_config(tmp_path, {"agents": {"scout": {"escalation_only": False}}})
+    base = {"tool_name": "Agent", "cwd": str(tmp_path),
+            "tool_input": {"subagent_type": "scout", "model": "fable",
+                           "prompt": "find X"}}
+    assert run_guard(base).returncode == 0

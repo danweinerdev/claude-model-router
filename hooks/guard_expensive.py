@@ -91,10 +91,19 @@ def main():
         return 0  # unregistered and not generic: not this guard's business
 
     ceiling = router_config.ceiling_tier(config)
-    if not router_config.is_escalation_only(entry, config):
-        return 0  # cheaper tier, or an explicit `escalation_only: false` opt-in
 
+    if entry.get("escalation_only") is False:
+        return 0  # explicit opt-in: covers the agent's tier and any override
+
+    # A spawn may name a model directly, which is how the protocol retries an
+    # agent one tier up without swapping it for a different one. That override
+    # is the effective tier, so the ceiling has to be judged on it too --
+    # otherwise `scout` with model=fable reaches the ceiling untouched.
     by_flag = entry.get("escalation_only") is True
+    by_tier = entry.get("tier") == ceiling
+    by_model = router_config.names_tier(tool_input.get("model"), ceiling)
+    if not (by_flag or by_tier or by_model):
+        return 0
 
     if ESCALATION_MARKER in spawn_text(tool_input):
         return 0  # a verified escalation; the protocol earned this spawn
@@ -102,8 +111,13 @@ def main():
     # Name why this agent counts as the ceiling. A tier-based block on an agent
     # nobody thinks of as expensive is nearly always a misconfigured `ceiling`,
     # and that is only diagnosable if the message says which rule fired.
-    reason = "marked escalation_only" if by_flag \
-        else f"on the ceiling tier '{ceiling}'"
+    if by_flag:
+        reason = "marked escalation_only"
+    elif by_tier:
+        reason = f"on the ceiling tier '{ceiling}'"
+    else:
+        reason = (f"requested with model '{tool_input.get('model')}', which is "
+                  f"the ceiling tier '{ceiling}'")
     cheaper = entry.get("escalates_from")
     hint = f" Start at '{cheaper}' and escalate on verified failure." if cheaper else ""
     # Always name the per-agent opt-in. Reaching for the session-wide env var

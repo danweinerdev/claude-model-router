@@ -225,6 +225,19 @@ def ceiling_tier(config=None, cwd=None):
     return available[-1]
 
 
+def names_tier(model, tier):
+    """Whether a spawn's `model` value refers to `tier`.
+
+    Accepts a bare tier name (`fable`) or a full model id containing it
+    (`claude-fable-5`), matching how stats.py prices by substring. A model the
+    router cannot interpret is not treated as naming any tier: this decides
+    whether to *deny*, so an unrecognised value must fail open.
+    """
+    if not isinstance(model, str) or not isinstance(tier, str) or not tier:
+        return False
+    return tier.lower() in model.lower()
+
+
 def is_escalation_only(entry, config=None, cwd=None):
     """Whether an agent is reachable only as an escalation.
 

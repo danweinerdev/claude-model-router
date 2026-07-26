@@ -336,3 +336,28 @@ def test_profile_annotation_does_not_erase_the_builtin_entry(escalation_config):
     assert builder["tier"] == "sonnet"
     assert "implement-from-plan" in builder["capabilities"]
     assert builder["escalates_to"] == "sdd-planner:code-implementer"
+
+
+def test_base_registry_is_self_contained():
+    """model-router must work with no profiles and no other plugin installed."""
+    config = router_config.load()
+    assert not config["profiles"]
+    for name, entry in router_config.agents(config).items():
+        assert ":" not in name, f"base registry references external agent {name}"
+        target = entry.get("escalates_to")
+        assert target is None or target in config["agents"], \
+            f"{name} escalates to '{target}', absent from the base registry"
+
+
+def test_shipped_config_names_no_other_plugin():
+    text = (ROOT / "router-config.json").read_text()
+    assert "sdd-planner" not in text
+
+
+def test_names_tier_matches_bare_and_full_model_ids():
+    assert router_config.names_tier("fable", "fable")
+    assert router_config.names_tier("claude-fable-5", "fable")
+    assert not router_config.names_tier("claude-sonnet-5", "fable")
+    # anything uninterpretable names no tier, so the guard fails open
+    for junk in (None, "", 42, [], "some-local-llm"):
+        assert not router_config.names_tier(junk, "fable")
